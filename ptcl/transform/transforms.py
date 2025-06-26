@@ -1,4 +1,5 @@
 from . import Transform
+from typing import Union
 
 class RootTransform(Transform):
 
@@ -50,7 +51,7 @@ class ExtractToken(Transform):
         super().__init__()
         self.begin = begin
 
-    def transform(self, data: list[str] | str):
+    def transform(self, data: Union[list[str], str]):
         return (data[1:], data[0]) if self.begin else (data[:-1], data[-1])
 
 class RouteOnKeyword(Transform):
