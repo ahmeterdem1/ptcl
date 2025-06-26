@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ptcl"
-version = "0.0.1"
+version = "0.1.0"
 description = "A framework for creating protocols and socket servers"
 authors = ["Ahmet Erdem <ahmetblk1035@gmail.com>"]
 license = "MIT"

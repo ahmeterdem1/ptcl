@@ -3,6 +3,8 @@ import os
 import socket
 import threading
 from ..socket import AbstractSocket
+from ..protocol import Protocol
+from ..logger import logger_
 
 class Server:
     """
@@ -11,7 +13,8 @@ class Server:
     """
 
     def __init__(self, host: str, port: int, handler_class: type[AbstractSocket],
-                 use_ssl: bool = False, certfile: str = None, keyfile: str = None):
+                 protocol: Protocol, use_ssl: bool = False, certfile: str = None,
+                 keyfile: str = None):
         """
         Initializes the Server.
 
@@ -30,6 +33,8 @@ class Server:
         self._use_ssl = use_ssl
         self._server_socket = None  # The main listening socket
         self._ssl_context = None
+        self.protocol = protocol
+        self.logger = logger_
 
         if self._use_ssl:
             if not certfile or not keyfile:
@@ -41,6 +46,8 @@ class Server:
             self._ssl_context.load_cert_chain(certfile, keyfile)
             self._ssl_context.set_ciphers('HIGH:!aNULL:!kRSA:!PSK:!SRP:!DSS:!RC4')
             self._ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+
+        self.logger.info("Server started.")
 
     def run(self):
         """
@@ -54,14 +61,10 @@ class Server:
         try:
             self._server_socket.bind((self._host, self._port))
             self._server_socket.listen(5)  # Allow up to 5 queued connections
-            print(f"Server listening on {self._host}:{self._port} {'with SSL/TLS' if self._use_ssl else ''}...")
-            print("Waiting for incoming connections...")
+            self.logger.info(f"Server listening on {self._host}:{self._port} {'with SSL/TLS' if self._use_ssl else ''}...")
+            self.logger.info("Waiting for incoming connections...")
 
             while True:
-                # Accept a new client connection
-                # This call blocks until a client connects.
-                # 'conn' is the new, dedicated socket for this client.
-                # 'addr' is the client's (IP, port) pair.
                 conn, addr = self._server_socket.accept()
 
                 # If SSL is enabled, wrap the accepted connection
@@ -69,35 +72,35 @@ class Server:
                 if self._use_ssl:
                     try:
                         current_conn = self._ssl_context.wrap_socket(conn, server_side=True)
-                        print(f"Main thread: SSL/TLS Handshake successful with {addr}")
+                        self.logger.info(f"Main thread: SSL/TLS Handshake successful with {addr}")
                     except ssl.SSLError as e:
-                        print(f"Main thread: SSL/TLS Handshake failed with {addr}: {e}")
-                        conn.close()  # Close the raw socket if handshake fails
-                        continue  # Go back to accept the next connection
+                        self.logger.warning(f"Main thread: SSL/TLS Handshake failed with {addr}: {e}")
+                        conn.close()
+                        continue
                     except Exception as e:
-                        print(f"Main thread: Error wrapping socket for {addr}: {e}")
+                        self.logger.warning(f"Main thread: Error wrapping socket for {addr}: {e}")
                         conn.close()
                         continue
 
-                # Instantiate the user's custom ConnectionHandler class
                 # This object will manage the communication for this specific client.
-                handler_instance = self._handler_class(current_conn, addr)
+                handler_instance = self._handler_class(current_conn, addr, self.protocol)
 
-                # Start a new thread to run the handler's __call__ method.
-                # The __call__ method contains the infinite loop for receiving/transforming/sending.
+                # Start a new thread to run the handler's run method.
+                # The run method contains the infinite loop for receiving/transforming/sending.
                 handler_thread = threading.Thread(
-                    target=handler_instance,  # Calling the instance runs its __call__ method
-                    name=f"ClientHandler-{addr[1]}"  # Custom thread name for debugging
+                    target=handler_instance.run,  # Calling the instance runs its run method
+                    name=f"ClientHandlerSocket-{addr[1]}"
                 )
                 handler_thread.daemon = True  # Allows the main program to exit cleanly
                 handler_thread.start()
+                self.logger.info("Data received and passed to thread.")
 
         except KeyboardInterrupt:
-            print("\nServer shutting down due to user interrupt.")
+            self.logger.warning("\nServer shutting down due to user interrupt.")
         except Exception as e:
-            print(f"An unexpected error occurred in the main server loop: {e}")
+            self.logger.warning(f"An unexpected error occurred in the main server loop: {e}")
         finally:
             # Ensure the main listening socket is closed when the server stops
             if self._server_socket:
                 self._server_socket.close()
-                print("Server listening socket closed.")
+                self.logger.info("Server listening socket closed.")

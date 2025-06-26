@@ -80,3 +80,12 @@ class ReverseTransform(Transform):
 
     def transform(self, data):
         return data[::-1]
+
+class CombineTransform(Transform):
+
+    def __init__(self, combiner: str = " "):
+        super().__init__()
+        self.combiner = combiner
+
+    def transform(self, data):
+        return self.combiner.join(data)

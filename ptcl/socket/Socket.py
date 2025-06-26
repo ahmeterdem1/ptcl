@@ -6,4 +6,6 @@ class Socket(AbstractSocket):
         super().__init__(*args, **kwargs)
 
     def transform(self, data):
-        return data
+        return self.protocol(data)
+
+
