@@ -2,6 +2,15 @@ from abc import ABC, abstractmethod
 
 class Transform(ABC):
 
+    """
+        Parent class for all transforms.
+
+        A transform, is a callable which acts as a node
+        of a directed acyclic graph. Each transform, applies
+        predefined operations to the input data, which is
+        generally a string.
+    """
+
     def __init__(self, children: list = None):
         self.children = children if children else []  # This is only a list to satisfy case-based routing
 
